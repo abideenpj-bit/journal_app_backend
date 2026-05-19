@@ -22,15 +22,14 @@ connectDB();
 const app = express();
 
 app.use(express.json());
-app.use(
-  cors({
-    origin: "https://www.psychologicaljournal.org", // 🌟 your frontend URL
-    // origin: "http://localhost:5173", // 🌟 your frontend URL
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+app.use(cors({
+  origin: [
+    "http://localhost:5173",
+    "https://journal-app-frontend-five.vercel.app",
+    "https://www.psychologicaljournal.org"
+  ],
+  credentials: true
+}));
 
 
 
