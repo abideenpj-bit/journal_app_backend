@@ -1,137 +1,223 @@
 import User from "../models/User.js";
 import ExpertRequest from "../models/ExpertRequest.js";
-import { sendEmail } from "../utils/mailer.js"; // your mailer helper
+import { sendEmail } from "../utils/mailer.js";
 
 // Admin → get all pending expert requests
 export const getExpertRequests = async (req, res) => {
   try {
-    if (req.user.role !== "admin")
+    if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Access denied" });
+    }
 
-    const requests = await ExpertRequest.find({ status: "pending" }).populate(
-      "user",
-      "name email role"
-    );
+    const requests = await ExpertRequest.find({
+      status: "pending",
+    }).populate("user", "name email role");
 
     res.json(requests);
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.log("GET REQUEST ERROR:", error);
+    res.status(500).json({
+      message: "Server error",
+      error: error.message,
+    });
   }
 };
 
-// Admin → approve expert request
+// APPROVE EXPERT
 export const approveExpert = async (req, res) => {
   try {
-    if (req.user.role !== "admin")
+    if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Access denied" });
+    }
 
-    const request = await ExpertRequest.findById(req.params.requestId).populate(
-      "user"
-    );
+    const request = await ExpertRequest.findById(
+      req.params.requestId
+    ).populate("user");
 
-    if (!request) return res.status(404).json({ message: "Request not found" });
-    if (request.status !== "pending")
-      return res.status(400).json({ message: "Already processed" });
+    if (!request) {
+      return res.status(404).json({
+        message: "Request not found",
+      });
+    }
 
-    // 1️⃣ update role
+    if (request.status !== "pending") {
+      return res.status(400).json({
+        message: "Already processed",
+      });
+    }
+
+    // update role
     request.user.role = "expert";
 
-    // 🔔 notification (APPROVE)
+    // SAFE notifications
+    if (!request.user.notifications) {
+      request.user.notifications = [];
+    }
+
     request.user.notifications.push({
       message: "🎉 Your expert request has been approved!",
     });
+
     await request.user.save();
 
-    // 2️⃣ close request
+    // update request
     request.status = "approved";
     await request.save();
 
-    // ✅ send email
-    await sendEmail({
-      to: request.user.email,
-      subject: "Your Expert Request Has Been Approved!",
-      text: "Congratulations! Your expert request has been approved.",
-      html: "<h1>Approved!</h1><p>Your expert request has been approved.</p>",
-    });
+    // email
+    try {
+      await sendEmail({
+        to: request.user.email,
+        subject: "Expert Request Approved",
+        text: "Your expert request has been approved.",
+        html: `
+          <h1>Approved</h1>
+          <p>Your expert request has been approved.</p>
+        `,
+      });
+    } catch (emailError) {
+      console.log("EMAIL ERROR:", emailError.message);
+    }
 
-    res.json({ message: "User approved as Expert and email sent" });
+    res.json({
+      success: true,
+      message: "Expert approved successfully",
+    });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.log("APPROVE ERROR:", error);
+
+    res.status(500).json({
+      message: "Server error",
+      error: error.message,
+    });
   }
 };
 
-// Admin → reject expert request
+// REJECT EXPERT
 export const rejectExpert = async (req, res) => {
   try {
-    if (req.user.role !== "admin")
+    if (req.user.role !== "admin") {
       return res.status(403).json({ message: "Access denied" });
+    }
 
-    const request = await ExpertRequest.findById(req.params.requestId).populate(
-      "user"
-    );
+    const request = await ExpertRequest.findById(
+      req.params.requestId
+    ).populate("user");
 
-    if (!request) return res.status(404).json({ message: "Request not found" });
-    if (request.status !== "pending")
-      return res.status(400).json({ message: "Already processed" });
+    if (!request) {
+      return res.status(404).json({
+        message: "Request not found",
+      });
+    }
 
-    // 🔔 notification (REJECT)
+    if (request.status !== "pending") {
+      return res.status(400).json({
+        message: "Already processed",
+      });
+    }
+
+    // SAFE notifications
+    if (!request.user.notifications) {
+      request.user.notifications = [];
+    }
+
     request.user.notifications.push({
       message: "❌ Your expert request was rejected.",
     });
+
     await request.user.save();
 
+    // update request
     request.status = "rejected";
     await request.save();
 
-    // ✅ send email
-    await sendEmail({
-      to: request.user.email,
-      subject: "Your Expert Request Was Rejected",
-      text: "Unfortunately, your request to become an expert was rejected.",
-      html: "<h1>Rejected</h1><p>Your expert request was rejected.</p>",
-    });
+    // email
+    try {
+      await sendEmail({
+        to: request.user.email,
+        subject: "Expert Request Rejected",
+        text: "Your expert request was rejected.",
+        html: `
+          <h1>Rejected</h1>
+          <p>Your expert request was rejected.</p>
+        `,
+      });
+    } catch (emailError) {
+      console.log("EMAIL ERROR:", emailError.message);
+    }
 
-    res.json({ message: "Expert request rejected and email sent" });
+    res.json({
+      success: true,
+      message: "Expert request rejected successfully",
+    });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.log("REJECT ERROR:", error);
+
+    res.status(500).json({
+      message: "Server error",
+      error: error.message,
+    });
   }
 };
 
-// Author → submit expert request
+// AUTHOR REQUEST
 export const requestExpertController = async (req, res) => {
   try {
     const { message } = req.body;
 
     if (!req.user) {
-      return res.status(401).json({ message: "Unauthorized: user not found" });
+      return res.status(401).json({
+        message: "Unauthorized",
+      });
     }
 
     if (!message || message.trim() === "") {
-      return res.status(400).json({ message: "Message is required" });
+      return res.status(400).json({
+        message: "Message is required",
+      });
     }
 
-    const newRequest = await ExpertRequest.create({
+    const alreadyExists = await ExpertRequest.findOne({
+      user: req.user._id,
+      status: "pending",
+    });
+
+    if (alreadyExists) {
+      return res.status(400).json({
+        message: "You already have a pending request",
+      });
+    }
+
+    await ExpertRequest.create({
       user: req.user._id,
       message,
       status: "pending",
     });
 
-    // send email (optional, could fail)
     try {
       await sendEmail({
         to: req.user.email,
         subject: "Expert Request Submitted",
-        text: "Your request to become an expert has been submitted successfully.",
-        html: "<h1>Request Submitted</h1><p>Your expert request has been submitted successfully.</p>",
+        text: "Your request has been submitted.",
+        html: `
+          <h1>Request Submitted</h1>
+          <p>Your expert request has been submitted successfully.</p>
+        `,
       });
     } catch (emailError) {
-      console.error("Email sending failed:", emailError.message);
+      console.log("EMAIL ERROR:", emailError.message);
     }
 
-    res.json({ message: "Expert request submitted successfully" });
+    res.json({
+      success: true,
+      message: "Expert request submitted successfully",
+    });
   } catch (error) {
-    console.error("RequestExpertController Error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.log("REQUEST ERROR:", error);
+
+    res.status(500).json({
+      message: "Server error",
+      error: error.message,
+    });
   }
 };
-

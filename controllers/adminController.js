@@ -6,6 +6,7 @@ import axios from "axios";
 
 /**
  * STREAM Cloudinary file helper (used for both Author & Admin)
+ * Updated to support in-browser viewing (inline) instead of forcing downloads.
  */
 const streamCloudinaryFile = async (res, manuscript) => {
   if (!manuscript || !manuscript.fileId) {
@@ -22,7 +23,7 @@ const streamCloudinaryFile = async (res, manuscript) => {
     ? manuscript.fileId
     : `manuscripts/${manuscript.fileId}`;
 
-  // Generate signed Cloudinary URL
+  // Generate signed Cloudinary URL (Removed the "attachment" parameter to allow inline streaming)
   const signedUrl = cloudinary.utils.private_download_url(
     publicId,
     extension,
@@ -30,33 +31,40 @@ const streamCloudinaryFile = async (res, manuscript) => {
       resource_type: "raw",
       type: "authenticated",
       expires_at: Math.floor(Date.now() / 1000) + 60,
-      attachment: downloadName,
     }
   );
 
   // Stream file
   const cloudinaryResponse = await axios.get(signedUrl, { responseType: "stream" });
 
-  // Set proper headers
-  res.setHeader("Content-Disposition", `attachment; filename="${downloadName}"`);
-  res.setHeader("Content-Type", manuscript.contentType || "application/octet-stream");
+  // Dynamically determine fallback Content-Type if it's missing or generic binary
+  let detectedContentType = manuscript.contentType;
+  if (!detectedContentType || detectedContentType === "application/octet-stream") {
+    if (extension.toLowerCase() === "pdf") {
+      detectedContentType = "application/pdf";
+    }
+  }
+
+  // CRITICAL FIX: Changed "attachment" to "inline" so the browser renders the file natively
+  res.setHeader("Content-Disposition", `inline; filename="${downloadName}"`);
+  res.setHeader("Content-Type", detectedContentType || "application/pdf");
 
   cloudinaryResponse.data.pipe(res);
 };
 
 /**
- * Admin download: get any manuscript file
+ * Admin download/view: get any manuscript file
  */
 export const downloadManuscriptAdmin = async (req, res) => {
   try {
     const manuscript = await Manuscript.findById(req.params.id.trim());
     if (!manuscript) return res.status(404).json({ message: "Manuscript not found" });
 
-    // Admin can download any file
+    // Admin can access and view any file
     await streamCloudinaryFile(res, manuscript);
   } catch (err) {
-    console.error("Admin Download Error:", err);
-    res.status(500).json({ message: "File download failed" });
+    console.error("Admin View/Download Error:", err);
+    res.status(500).json({ message: "File loading failed" });
   }
 };
 
