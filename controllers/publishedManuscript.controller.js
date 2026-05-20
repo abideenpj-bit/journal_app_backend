@@ -1,20 +1,21 @@
 import Manuscript from "../models/Manuscript.js";
-import mongoose from "mongoose";
+import cloudinary from "../config/cloudinary.js";
 
-// 1. Function to get the LIST of manuscripts
+// Get all published manuscripts
 export const getAllPublishedManuscripts = async (req, res) => {
   try {
     const publishedManuscripts = await Manuscript.find({
       status: "published",
     })
       .populate("author", "name email")
-      .sort({ publishedAt: -1 });
+      .sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
       total: publishedManuscripts.length,
       data: publishedManuscripts,
     });
+
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -24,34 +25,55 @@ export const getAllPublishedManuscripts = async (req, res) => {
   }
 };
 
-// 2. Function to stream the actual PDF FILE
+// Open Published PDF from Cloudinary
 export const getPublishedFile = async (req, res) => {
   try {
-    const { id } = req.params; // Extracts ID from URL
+    const { id } = req.params;
 
     const manuscript = await Manuscript.findById(id);
 
     if (!manuscript || manuscript.status !== "published") {
-      return res.status(404).json({ message: "File not found or not published" });
+      return res.status(404).json({
+        success: false,
+        message: "File not found or not published",
+      });
     }
 
-    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
-      bucketName: "uploads", 
-    });
+    // Extract file extension
+    const extension = manuscript.filename
+      .split(".")
+      .pop();
 
-    res.set({
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${manuscript.filename}"`,
-    });
+    // Ensure proper public_id
+    const publicId = manuscript.fileId.startsWith("manuscripts/")
+      ? manuscript.fileId
+      : `manuscripts/${manuscript.fileId}`;
 
-    const downloadStream = bucket.openDownloadStream(manuscript.fileId);
+    // Generate signed download URL
+    const signedUrl = cloudinary.utils.private_download_url(
+      publicId,
+      extension,
+      {
+        resource_type: "raw",
+        type: "authenticated",
+        attachment: true, // Force download
+        expires_at:
+          Math.floor(Date.now() / 1000) + 300,
+        // Add filename for Content-Disposition header
+        flags: [`attachment:${manuscript.filename}`],
+      }
+    );
 
-    downloadStream.on("error", () => {
-      res.status(404).json({ message: "File data not found in storage" });
-    });
+    // Redirect to the signed URL to trigger download
+    return res.redirect(signedUrl);
 
-    downloadStream.pipe(res);
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Published File Error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+      error: error.message,
+    });
   }
 };

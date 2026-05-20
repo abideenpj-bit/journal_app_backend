@@ -33,6 +33,7 @@ export const register = async (req, res) => {
 };
 
 // ================= GOOGLE LOGIN SUCCESS =================
+// ================= GOOGLE LOGIN SUCCESS =================
 export const googleAuthSuccess = async (req, res) => {
   try {
     const user = req.user;
@@ -43,8 +44,10 @@ export const googleAuthSuccess = async (req, res) => {
       { expiresIn: "1d" }
     );
 
-    res.redirect(`http://localhost:5173/login-success?token=${token}`);
-    // res.redirect(`https://journal-app-frontend-five.vercel.app/login-success?token=${token}`);
+    // 🔑 FIX: Use process.env.FRONTEND_URL to handle both local dev and Vercel production automatically
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    
+    res.redirect(`${frontendUrl}/login-success?token=${token}`);
   } catch (error) {
     res.status(500).json({ message: "Google Auth Failed" });
   }
