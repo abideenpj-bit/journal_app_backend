@@ -8,49 +8,38 @@ import axios from "axios";
  * STREAM Cloudinary file helper (used for both Author & Admin)
  * Updated to support in-browser viewing (inline) instead of forcing downloads.
  */
+// controllers/adminController.js
+
 const streamCloudinaryFile = async (res, manuscript) => {
-  if (!manuscript || !manuscript.fileId) {
-    return res.status(404).json({ message: "File not found" });
-  }
+  // Use the stored contentType or default to pdf
+  const contentType = manuscript.contentType || "application/pdf";
+  
+  // Extract extension safely
+  const extension = manuscript.filename.includes(".") 
+    ? manuscript.filename.split(".").pop() 
+    : "pdf";
 
-  // Ensure correct extension
-  const extension = manuscript.filename.split(".").pop();
-  const downloadName = manuscript.filename.toLowerCase().endsWith(`.${extension}`)
+  const downloadName = manuscript.filename.includes(".")
     ? manuscript.filename
-    : `${manuscript.filename}.${extension}`;
+    : `${manuscript.filename}.pdf`;
 
-  const publicId = manuscript.fileId.startsWith("manuscripts/")
-    ? manuscript.fileId
-    : `manuscripts/${manuscript.fileId}`;
+  const publicId = manuscript.fileId; // Your model says this is the public_id
 
-  // Generate signed Cloudinary URL (Removed the "attachment" parameter to allow inline streaming)
-  const signedUrl = cloudinary.utils.private_download_url(
-    publicId,
-    extension,
-    {
-      resource_type: "raw",
-      type: "authenticated",
-      expires_at: Math.floor(Date.now() / 1000) + 60,
-    }
-  );
+  const signedUrl = cloudinary.utils.private_download_url(publicId, extension, {
+    resource_type: "raw",
+    type: "authenticated",
+    expires_at: Math.floor(Date.now() / 1000) + 60,
+  });
 
-  // Stream file
   const cloudinaryResponse = await axios.get(signedUrl, { responseType: "stream" });
 
-  // Dynamically determine fallback Content-Type if it's missing or generic binary
-  let detectedContentType = manuscript.contentType;
-  if (!detectedContentType || detectedContentType === "application/octet-stream") {
-    if (extension.toLowerCase() === "pdf") {
-      detectedContentType = "application/pdf";
-    }
-  }
-
-  // CRITICAL FIX: Changed "attachment" to "inline" so the browser renders the file natively
+  // This is what makes it open in the browser with the right name
   res.setHeader("Content-Disposition", `inline; filename="${downloadName}"`);
-  res.setHeader("Content-Type", detectedContentType || "application/pdf");
+  res.setHeader("Content-Type", contentType);
 
   cloudinaryResponse.data.pipe(res);
 };
+
 
 /**
  * Admin download/view: get any manuscript file
