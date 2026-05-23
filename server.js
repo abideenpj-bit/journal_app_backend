@@ -26,6 +26,7 @@ app.use(cors({
   origin: [
     "http://localhost:5173",
     "https://journal-app-frontend-five.vercel.app",
+    "https://journal-app-frontend-drab.vercel.app",
     "https://www.psychologicaljournal.org"
   ],
   credentials: true
