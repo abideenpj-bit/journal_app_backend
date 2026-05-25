@@ -101,9 +101,9 @@ export const assignReviewer = async (req, res) => {
     if (!reviewer || reviewer.role !== "expert")
       return res.status(400).json({ message: "Invalid reviewer" });
 
-    manuscript.reviewer = reviewerId;
-    manuscript.status = "submitted";
-    manuscript.submittedAt = new Date();
+   manuscript.reviewer = reviewerId;
+manuscript.status = "under review";
+manuscript.submittedAt = new Date();
 
     await manuscript.save();
 
