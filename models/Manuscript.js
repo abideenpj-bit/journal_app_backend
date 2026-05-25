@@ -55,9 +55,15 @@ const manuscriptSchema = new mongoose.Schema({
   reviewer: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   status: {
     type: String,
-    enum: ["pending","submitted","under_review","accepted","rejected","published"],
-    default: "pending",
-  },
+    enum: [
+    "pending",
+    "under_review",
+    "accepted",
+    "rejected",
+    "published",
+  ],
+  default: "pending",
+},
   reviewerComments: { type: String, default: "" },
   submittedAt: Date,
 }, { timestamps: true });
