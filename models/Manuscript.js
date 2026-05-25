@@ -16,10 +16,17 @@
 //   author: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
 //   reviewer: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
 
-//   status: {
-//     type: String,
-//     enum: ["pending","submitted","under_review","accepted","rejected","published"],
-//     default: "pending",
+//  status: {
+  type: String,
+  enum: [
+    "pending",
+    "under review",
+    "accepted",
+    "rejected",
+    "published",
+  ],
+  default: "pending",
+},
 //   },
 
 //   reviewerComments: { type: String, default: "" },
